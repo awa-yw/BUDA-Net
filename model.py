@@ -276,15 +276,22 @@ class DualBranchDeblurRepairNet(nn.Module):
         self.deblur = DeblurDecoder(base=base)
         self.repair = RepairDecoder(base=base)
 
-    def forward(self, x):
+    def forward(self, x, ablation="full"):
         m = self.mnet(x)                # (B,1,H,W) in [0,1]
         f1, f2, f3 = self.encoder(x)
 
         id_ = self.deblur(f1, f2, f3)   # I_d
         ir  = self.repair(f1, f2, f3, m) # I_r
 
-        # confidence-guided fusion
-        iout = (1.0 - m) * id_ + m * ir
+        if ablation == "deblur_only":
+            iout = id_
+        elif ablation == "no_m":
+            iout = 0.5 * (id_ + ir)
+        elif ablation == "fixed_fusion":
+            iout = 0.7 * id_ + 0.3 * ir
+        else:  # "full"
+            iout = (1.0 - m) * id_ + m * ir
+
         return {"I_d": id_, "I_r": ir, "M": m, "I_out": iout}
 
 

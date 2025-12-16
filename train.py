@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 import os
 import argparse
 import torch
@@ -77,7 +78,7 @@ def main(args):
 
     # ---- data loaders ----
     gopro_loader = DataLoader(
-        GoProDataset("datasets/gopro", "train", args.crop_size, True),
+        GoProDataset("/root/nfs/hmj/ImP/MyTest/BUDA-Net/datasets/gopro_deblur", "train", args.crop_size, True),
         batch_size=args.batch_size,
         shuffle=True,
         num_workers=args.num_workers,
@@ -85,12 +86,12 @@ def main(args):
     )
 
     test_gopro_loader = DataLoader(
-        GoProDataset("datasets/gopro", "test", args.crop_size, False),
+        GoProDataset("/root/nfs/hmj/ImP/MyTest/BUDA-Net/datasets/gopro_deblur", "test", args.crop_size, False),
         batch_size=1, shuffle=False, num_workers=2
     )
 
     uhd_loader = DataLoader(
-        UHDDIPDataset("datasets/uhd", "train", args.crop_size, True),
+        UHDDIPDataset("/root/nfs/hmj/ImP/MyTest/datasets/UHD", "train", args.crop_size, True),
         batch_size=args.batch_size,
         shuffle=True,
         num_workers=args.num_workers,
@@ -98,7 +99,7 @@ def main(args):
     )
 
     test_uhd_loader = DataLoader(
-        UHDDIPDataset("datasets/uhd", "test", args.crop_size, False),
+        UHDDIPDataset("/root/nfs/hmj/ImP/MyTest/datasets/UHD", "test", args.crop_size, False),
         batch_size=1, shuffle=False, num_workers=2
     )
 
@@ -156,12 +157,16 @@ def main(args):
 
             for blur, sharp in gopro_loader:
                 blur, sharp = blur.to(device), sharp.to(device)
-                out = net(blur)
+                out = net(blur, ablation=args.ablation)
                 I_d = out["I_d"]
-                I_out = I_d if args.ablation == "deblur_only" else out["I_out"]
+                I_out = out["I_out"]
 
                 loss_deblur = l1_loss(I_d, sharp) + 0.1 * edge_loss(I_d, sharp)
-                loss = loss_deblur + l1_loss(I_out, sharp)
+
+                if args.ablation == "deblur_only":
+                    loss = loss_deblur
+                else:
+                    loss = loss_deblur + l1_loss(I_out, sharp)
 
                 optimizer.zero_grad()
                 loss.backward()
@@ -169,7 +174,7 @@ def main(args):
                 loss_sum += loss.item()
 
             avg_loss = loss_sum / len(gopro_loader)
-            psnr_g, ssim_g = evaluate(net, test_gopro_loader, device)
+            psnr_g, ssim_g = evaluate(net, test_gopro_loader, device, ablation=args.ablation)
 
             csv_logger.log(epoch, "stage1", loss_deblur.item(), 0.0,
                            avg_loss, psnr_g, ssim_g, 0.0, 0.0)
@@ -201,17 +206,16 @@ def main(args):
 
         for blur, sharp in uhd_loader:
             blur, sharp = blur.to(device), sharp.to(device)
-            out = net(blur)
-            I_d, I_r, M = out["I_d"], out["I_r"], out["M"]
+            out = net(blur, ablation=args.ablation)
+            I_d, I_r, M, I_out = out["I_d"], out["I_r"], out["M"], out["I_out"]
 
-            if args.ablation == "no_m":
-                I_out = 0.5 * (I_d + I_r)
+            if args.ablation == "deblur_only":
+                loss_r = torch.tensor(0.0, device=device)
+            elif args.ablation == "no_m":
                 loss_r = (I_r - sharp).abs().mean()
             elif args.ablation == "fixed_fusion":
-                I_out = 0.7 * I_d + 0.3 * I_r
                 loss_r = (M * (I_r - sharp).abs()).mean()
-            else:
-                I_out = (1 - M) * I_d + M * I_r
+            else:  # full
                 loss_r = (M * (I_r - sharp).abs()).mean()
 
             loss_d = l1_loss(I_d, sharp)
@@ -223,8 +227,8 @@ def main(args):
             loss_sum += loss.item()
 
         avg_loss = loss_sum / len(uhd_loader)
-        psnr_g, ssim_g = evaluate(net, test_gopro_loader, device)
-        psnr_u, ssim_u = evaluate(net, test_uhd_loader, device)
+        psnr_g, ssim_g = evaluate(net, test_gopro_loader, device, ablation=args.ablation)
+        psnr_u, ssim_u = evaluate(net, test_uhd_loader, device, ablation=args.ablation)
 
         csv_logger.log(epoch, "stage2", loss_d.item(), loss_r.item(),
                        avg_loss, psnr_g, ssim_g, psnr_u, ssim_u)
@@ -267,7 +271,7 @@ if __name__ == "__main__":
     parser.add_argument("--lr", type=float, default=2e-4)
     parser.add_argument("--base_channels", type=int, default=48)
     parser.add_argument("--repair_weight", type=float, default=0.5)
-    parser.add_argument("--ablation", type=str, default="full",
+    parser.add_argument("--ablation", type=str, default="deblur_only",
                         choices=["full", "deblur_only", "no_m", "fixed_fusion"])
     parser.add_argument("--save_dir", type=str, default="checkpoints/full")
     parser.add_argument("--log_dir", type=str, default="logs/full")
