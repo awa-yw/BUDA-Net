@@ -1,0 +1,9 @@
+datasets/gopro/*
+datasets/uhd/*
+
+*/__pycache__/
+.vscode
+
+checkpoints/
+
+*.pyc
