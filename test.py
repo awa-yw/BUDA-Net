@@ -46,7 +46,8 @@ def evaluate(model, loader):
         blur = blur.to(device)
         sharp = sharp.to(device)
 
-        out = model(blur)
+        out = model(blur, ablation=args.ablation)
+
         pred = out["I_out"].clamp(0, 1)
 
         for i in range(pred.size(0)):
@@ -120,6 +121,12 @@ if __name__ == "__main__":
     parser.add_argument("--num_workers", type=int, default=4)
     parser.add_argument("--base_channels", type=int, default=48,
                         help="Base channels of BUDA-Net")
+    parser.add_argument(
+    "--ablation",
+        type=str,
+        default="deblur_only",
+        choices=["full", "deblur_only", "no_m", "fixed_fusion"]
+    )
 
     args = parser.parse_args()
     main(args)
