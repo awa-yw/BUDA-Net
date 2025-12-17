@@ -141,6 +141,15 @@ def main(args):
             "best_psnr_gopro": best_psnr_gopro,
             "best_psnr_uhd": best_psnr_uhd,
         }, os.path.join(args.save_dir, "latest.pth"))
+    # Stage-1 scheduler
+    scheduler_s1 = torch.optim.lr_scheduler.CosineAnnealingLR(
+        optimizer, T_max=args.stage1_epochs, eta_min=1e-6
+    )
+
+    # Stage-2 scheduler
+    scheduler_s2 = torch.optim.lr_scheduler.CosineAnnealingLR(
+        optimizer, T_max=args.stage2_epochs, eta_min=1e-6
+    )
 
     # ==================================================
     # Stage-1: GoPro
@@ -178,7 +187,7 @@ def main(args):
 
             csv_logger.log(epoch, "stage1", loss_deblur.item(), 0.0,
                            avg_loss, psnr_g, ssim_g, 0.0, 0.0)
-
+            # scheduler_s1.step()
             if psnr_g > best_psnr_gopro:
                 best_psnr_gopro = psnr_g
                 torch.save(net.state_dict(),
@@ -232,7 +241,7 @@ def main(args):
 
         csv_logger.log(epoch, "stage2", loss_d.item(), loss_r.item(),
                        avg_loss, psnr_g, ssim_g, psnr_u, ssim_u)
-
+        scheduler_s2.step()
         if psnr_g > best_psnr_gopro:
             best_psnr_gopro = psnr_g
             torch.save(net.state_dict(),

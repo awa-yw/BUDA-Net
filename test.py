@@ -9,7 +9,7 @@ from model import DualBranchDeblurRepairNet
 from datasets.gopro_dataset import GoProDataset
 from datasets.uhd_dip_dataset import UHDDIPDataset
 
-device = "cuda" if torch.cuda.is_available() else "cpu"
+device = "cuda:3" if torch.cuda.is_available() else "cpu"
 
 
 # =====================
