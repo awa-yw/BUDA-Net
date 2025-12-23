@@ -1,4 +1,4 @@
-datasets/gopro/*
+datasets/gopro_deblur/*
 datasets/uhd/*
 
 */__pycache__/

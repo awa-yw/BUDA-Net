@@ -21,19 +21,23 @@ def ssim(pred, gt, C1=0.01**2, C2=0.03**2):
     return num / den
 
 @torch.no_grad()
-def evaluate(model, loader, device):
+def evaluate(model, dataloader, device, ablation="full"):
     model.eval()
-    psnr_list, ssim_list = [], []
+    total_psnr = 0
+    total_ssim = 0
+    count = 0
 
-    for blur, sharp in loader:
-        blur = blur.to(device)
-        sharp = sharp.to(device)
+    with torch.no_grad():
+        for blur, sharp in dataloader:
+            blur, sharp = blur.to(device), sharp.to(device)
+            out = model(blur, ablation=ablation)  # 传给 model.forward()
+            pred = out["I_out"]
 
-        out = model(blur)
-        pred = out["I_out"].clamp(0, 1)
+            psnr_val = psnr(pred, sharp)
+            ssim_val = ssim(pred, sharp)
 
-        for i in range(pred.size(0)):
-            psnr_list.append(psnr(pred[i], sharp[i]).item())
-            ssim_list.append(ssim(pred[i], sharp[i]).item())
+            total_psnr += psnr_val
+            total_ssim += ssim_val
+            count += 1
 
-    return float(np.mean(psnr_list)), float(np.mean(ssim_list))
+    return total_psnr / count, total_ssim / count

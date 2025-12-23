@@ -28,11 +28,11 @@ class UHDDIPDataset(Dataset):
         super().__init__()
 
         if split == "train":
-            self.blur_dir = os.path.join(root, "train", "input_new")
-            self.sharp_dir = os.path.join(root, "train", "gt_new")
+            self.blur_dir = os.path.join(root, "train", "LR")
+            self.sharp_dir = os.path.join(root, "train", "GT")
         elif split == "test":
-            self.blur_dir = os.path.join(root, "test", "input300")
-            self.sharp_dir = os.path.join(root, "test", "gt300")
+            self.blur_dir = os.path.join(root, "test", "LR")
+            self.sharp_dir = os.path.join(root, "test", "GT")
         else:
             raise ValueError("split must be 'train' or 'test'")
 
